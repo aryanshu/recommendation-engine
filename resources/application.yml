@@ -1,0 +1,17 @@
+database_source:
+  hostname_source : 'localhost'
+  database_source : 'registration'
+  username_source : 'postgres'
+  password_source : 'Arya%40123'
+  port_id_source : 5432
+
+database_destination:
+  hostname_destination : 'localhost'
+  database_destination : 'user_database_etl'
+  username_destination : 'postgres'
+  password_destination : 'Arya%40123'
+  port_id_destination : 5432
+
+elasticsearch:
+  elastic_host : 'http://localhost'
+  elastic_port : '9200'
