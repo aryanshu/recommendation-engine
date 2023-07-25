@@ -15,8 +15,8 @@ if __name__ == "__main__":
 
     cosine_similarity = similarity()
     result = cosine_similarity.user_similarity()
-    logging.debug(result)
-    print(result)
+    # logging.debug(result)
+    # print(result)
     pushing_recommendation = elasticsearch_script()
     pushing_recommendation.push_recommendation(result=result)
 

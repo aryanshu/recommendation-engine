@@ -8,6 +8,7 @@ from datetime import datetime
 from sklearn import preprocessing
 from sklearn.preprocessing import MinMaxScaler
 import os
+from utils import Constants
 
 
 class similarity():
@@ -113,30 +114,70 @@ class similarity():
         children_encoded_df = pd.DataFrame(children_encoded.toarray(), columns=children_encoder.\
                                            get_feature_names_out(['children']))
 
+        user_profile_df['latitude'] = user_profile_df['location'].apply(lambda x: x.split(" ")[0].replace("lat:", ""))
+        user_profile_df['longitude'] = user_profile_df['location'].apply(lambda x: x.split(" ")[1].replace("long:", ""))
+
+        user_profile_df['latitude'] = pd.to_numeric(user_profile_df['latitude'])
+        user_profile_df['longitude'] = pd.to_numeric(user_profile_df['longitude'])
+
+        path = 'resources/'+"user_profile_normalised"+".csv"
+        user_profile_df.to_csv(path, index=False)
+
         user_profile_df = pd.concat(
             [user_profile_df, gender_encoded_df, global_encoded_df, pets_encoded_df, preferance_encoder_df,\
              sleeping_encoded_df, star_sign_encoded_df, status_encoded_df, vaccinated_encoded_df,
              relation_goal_encoded_df\
                 , diet_encoded_df, children_encoded_df], axis=1)
 
-        user_profile_df.drop(
-            ['id', 'location', 'work_at', 'dob', 'children', 'diet', 'drink', 'education', 'exercise', 'gender',
-             'global', 'personality',\
-             'pets', 'preferance', 'relation_goal', 'sleeping', 'smoke', 'star_sign', 'status', 'vaccinated', 'age'],
-            axis=1, inplace=True)
+        latitude_bins = Constants.latitude_bins
+        longitude_bins = Constants.longitude_bins
+
+        # Create labels based on the ranges
+        user_profile_df['latitude_range'] = pd.cut(user_profile_df['latitude'], bins=latitude_bins)
+        user_profile_df['longitude_range'] = pd.cut(user_profile_df['longitude'], bins=longitude_bins)
+
+        # Group the DataFrame based on the labels and split into multiple DataFrames
+        grouped_df = user_profile_df.groupby(['latitude_range', 'longitude_range'])
+
+        # Create a dictionary to store the resulting DataFrames
+        df_dict = {}
+        for group_name, group_data in grouped_df:
+            df_name = f"latitude_{group_name[0]}_longitude_{group_name[1]}"
+            Constants.df_names.append(df_name)
+            df_dict[df_name] = group_data.drop(columns=['latitude_range', 'longitude_range'])
+
+        # Access individual DataFrames using keys in df_dict
+        print(df_dict.keys())
 
         user_interests_df = pd.read_csv(user_interests)
 
-        bool_columns = ['ayurveda', 'bollywood', 'classical_music', 'cooking', 'crafts', 'cricket',\
-                        'cycling', 'dancing', 'fashion', 'food', 'gaming', 'gardening', 'gym',\
-                        'hiking', 'history_and_culture', 'indian_cuisine', 'meditation', 'movies',\
-                        'music', 'painting', 'pets', 'photography', 'reading', 'regional_dance', 'spirituality',\
+        bool_columns = ['ayurveda', 'bollywood', 'classical_music', 'cooking', 'crafts', 'cricket', \
+                        'cycling', 'dancing', 'fashion', 'food', 'gaming', 'gardening', 'gym', \
+                        'hiking', 'history_and_culture', 'indian_cuisine', 'meditation', 'movies', \
+                        'music', 'painting', 'pets', 'photography', 'reading', 'regional_dance', 'spirituality', \
                         'sports', 'swimming', 'technology', 'traveling', 'volunteering', 'writing', 'yoga']
         user_interests_df[bool_columns] = user_interests_df[bool_columns].replace({True: 1, False: 0})
 
-        user_profile_df = pd.concat([user_profile_df, user_interests_df], axis=1)
+        cosine_sim_list = []
+        for df_name, df in df_dict.items():
+            print(f"\nDataFrame: {df_name}")
+            # print(df)
+            path = 'resources/'+df_name+".csv"
+            df.to_csv(path, index=False)
 
-        scaler = MinMaxScaler(feature_range=(0, 1))
-        normalized_data = scaler.fit_transform(user_profile_df)
-        cosine_sim = cosine_similarity(normalized_data)
-        return cosine_sim
+            df.drop(
+                ['location', 'latitude', 'longitude',  'work_at', 'dob', 'children', 'diet', 'drink', 'education', 'exercise', 'gender',
+                 'global', 'personality', \
+                 'pets', 'preferance', 'relation_goal', 'sleeping', 'smoke', 'star_sign', 'status', 'vaccinated', 'age'],
+                axis=1, inplace=True)
+
+            merged_df = df.merge(user_interests_df, left_on='id', right_on='userid', how='left')
+            merged_df.drop(columns='userid', inplace=True)
+
+
+            scaler = MinMaxScaler(feature_range=(0, 1))
+            normalized_data = scaler.fit_transform(merged_df)
+            cosine_sim = cosine_similarity(normalized_data)
+            cosine_sim_list.append(cosine_sim)
+            print("cosine_sim"+str(len(cosine_sim)))
+        return cosine_sim_list
